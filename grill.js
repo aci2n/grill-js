@@ -58,11 +58,17 @@
 			html += '<th>' + this.labels.col[i] + '</th>';
 		}		
 		html += '</tr></thead><tbody>';
+		
+		var min = this.getMin();
 		for (var i = 0; i < this.data.length; i++) {
 			html += '<tr><td>' + this.labels.row[i] + '</td>';
 			var row = this.data[i];
 			for (var j = 0; j < row.length; j++) {
-				html += '<td>' + (j > i ? row[j] : '') + '</td>';
+				var css = '';
+				if (i === min.x && j === min.y) css += 'background-color:yellow;'
+				else if (i === j) css += 'background-color:gray;'
+				
+				html += '<td' + (css ? ' style="' + css + '"' : '') + '>' + (j > i ? row[j] : '') + '</td>';
 			}
 			row += '</tr>';
 		}		
@@ -71,50 +77,46 @@
 		return html;
 	};
 	
-	Matrix.prototype.getOffsetMatrixX = function() {
-		var offsetMatrix = new Matrix(this.logTargetSelector);
-			
-		for (var i = 0; i < this.data.length; i++) {
-			var firstRow = this.data[i];			
-			for (var j = 0; j < this.data.length; j++) {
-				var secondRow = this.data[j];				
-				var offset = 0;
-				for (var k = 0; i !== j && k < firstRow.length; k++) {
-					offset += Math.abs(firstRow[k] - secondRow[k]);
-				}
-				offsetMatrix.set(i, j, offset);
-			}
-		}
-		
-		offsetMatrix.labels.row = offsetMatrix.labels.col = this.labels.row.slice();
-		
-		offsetMatrix.log('getOffsetMatrixX');
-		
+	Matrix.prototype.getOffsetMatrix = function(offsetCalculator, labelAxis) {
+		var offsetMatrix = new Matrix(this.logTargetSelector);		
+		offsetMatrix.labels.row = offsetMatrix.labels.col = this.labels[labelAxis].slice();
+		offsetCalculator.call(this, offsetMatrix);
+		offsetMatrix.log('getOffsetMatrix-' + labelAxis);
 		return offsetMatrix;
 	};
 	
-	Matrix.prototype.getOffsetMatrixY = function(complement) {
-		var offsetMatrix = new Matrix(this.logTargetSelector);
-			
-		for (var i = 0; i < this.data[0].length; i++) {
-			for (var j = 0; j < this.data[0].length; j++) {
-				var offset = 0;
-				for (var k = 0; i !== j && k < this.data.length; k++) {
-					var subtrahend = this.data[k][j];
-					if (complement) {
-						subtrahend = complement + 1 - subtrahend; 
+	Matrix.prototype.getOffsetMatrixX = function() {			
+		return this.getOffsetMatrix((offsetMatrix) => {
+			for (var i = 0; i < this.data.length; i++) {
+				var firstRow = this.data[i];			
+				for (var j = 0; j < this.data.length; j++) {
+					var secondRow = this.data[j];				
+					var offset = 0;
+					for (var k = 0; i !== j && k < firstRow.length; k++) {
+						offset += Math.abs(firstRow[k] - secondRow[k]);
 					}
-					offset += Math.abs(this.data[k][i] - subtrahend);
+					offsetMatrix.set(i, j, offset);
 				}
-				offsetMatrix.set(i, j, offset);
 			}
-		}
-		
-		offsetMatrix.labels.row = offsetMatrix.labels.col = this.labels.col.slice();
-		
-		offsetMatrix.log('getOffsetMatrixY');
-		
-		return offsetMatrix;
+		}, 'row');
+	};
+	
+	Matrix.prototype.getOffsetMatrixY = function(complement) {
+		return this.getOffsetMatrix((offsetMatrix) => {
+			for (var i = 0; i < this.data[0].length; i++) {
+				for (var j = 0; j < this.data[0].length; j++) {
+					var offset = 0;
+					for (var k = 0; i !== j && k < this.data.length; k++) {
+						var subtrahend = this.data[k][j];
+						if (complement) {
+							subtrahend = complement + 1 - subtrahend; 
+						}
+						offset += Math.abs(this.data[k][i] - subtrahend);
+					}
+					offsetMatrix.set(i, j, offset);
+				}
+			}
+		}, 'col');
 	};
 	
 	Matrix.prototype.reduceOnce = function() {
@@ -176,48 +178,44 @@
 	};
 	
 	Matrix.prototype.reduceToEnd = function() {
-		if (this.data.length === 1) {
+		if (this.data.length < 3) {
 			return this;
 		}
 		
 		return this.reduceOnce().reduceToEnd();
 	};
 
-	Matrix.keepMinValues = function(base, complement) {
-		var newMatrix = new Matrix(base.logTargetSelector);
-		newMatrix.labels.row = newMatrix.labels.col = base.labels.col.slice();
-		var complementCols = {};
-		
-		for (var i = 0; i < base.data.length; i++) {
-			var row = base.data[i];
+	Matrix.prototype.keepMinValuesAgainstComplement = function(complement) {
+		return this.getOffsetMatrix((offsetMatrix) => {
+			var complementCols = {};
 			
-			for (var j = 0; j < row.length; j++) {
-				var min = base.data[i][j];
+			for (var i = 0; i < this.data.length; i++) {
+				var row = this.data[i];
 				
-				if (complement.data[i][j] < base.data[i][j]) {
-					min = complement.data[i][j];
-					if (j > i) {
-						complementCols[j] = true;
+				for (var j = 0; j < row.length; j++) {
+					var min = this.data[i][j];
+					
+					if (complement.data[i][j] < this.data[i][j]) {
+						min = complement.data[i][j];
+						if (j > i) {
+							complementCols[j] = true;
+						}
 					}
+					
+					offsetMatrix.set(i, j, min);
 				}
-				
-				newMatrix.set(i, j, min);
 			}
-		}
-		
-		for (var i = 0; i < newMatrix.labels.row.length; i++) {
-			if (complementCols[i]) {
-				newMatrix.labels.row[i] = '~' + newMatrix.labels.row[i];
+			
+			for (var i = 0; i < offsetMatrix.labels.row.length; i++) {
+				if (complementCols[i]) {
+					offsetMatrix.labels.row[i] = '~' + offsetMatrix.labels.row[i];
+				}
 			}
-		}
-		
-		newMatrix.log('keepMinAgainstComplement');
-		
-		return newMatrix;
+		}, 'col');
 	};
 	
 	Matrix.prototype.getOffsetMatrixYKeepingMinAgainstComplement = function(complement) {
-		return Matrix.keepMinValues(this.getOffsetMatrixY(), this.getOffsetMatrixY(complement));
+		return this.getOffsetMatrixY().keepMinValuesAgainstComplement(this.getOffsetMatrixY(complement));
 	};
 	
 	grill.Matrix = Matrix;
@@ -227,8 +225,7 @@
 document.body.innerHTML = '<style>table,tr,td,th{border: 1px solid black}</style><div id="grill-log"></div><table id="tablita" style="display:none"> <tbody>  <tr><td>2</td><td>2</td><td>4</td><td>1</td><td>1</td><td>2</td><td>2</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>5</td><td>3</td><td>3</td><td>2</td><td>2</td><td>2</td></tr>  <tr><td>4</td><td>4</td><td>1</td><td>1</td><td>3</td><td>3</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>3</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td></tr>  <tr><td>3</td><td>3</td><td>4</td><td>3</td><td>2</td><td>4</td><td>2</td><td>4</td><td>1</td><td>1</td><td>1</td><td>2</td><td>1</td><td>1</td><td>3</td><td>2</td><td>1</td><td>1</td><td>1</td><td>1</td></tr>  <tr><td>1</td><td>1</td><td>1</td><td>1</td><td>2</td><td>3</td><td>1</td><td>1</td><td>2</td><td>1</td><td>2</td><td>1</td><td>4</td><td>3</td><td>1</td><td>1</td><td>1</td><td>1</td><td>2</td><td>1</td></tr>  <tr><td>1</td><td>1</td><td>1</td><td>3</td><td>5</td><td>2</td><td>1</td><td>4</td><td>1</td><td>2</td><td>2</td><td>1</td><td>2</td><td>1</td><td>1</td><td>1</td><td>1</td><td>2</td><td>1</td><td>1</td></tr>  <tr><td>4</td><td>4</td><td>5</td><td>4</td><td>4</td><td>4</td><td>2</td><td>5</td><td>1</td><td>4</td><td>1</td><td>3</td><td>4</td><td>1</td><td>2</td><td>1</td><td>2</td><td>1</td><td>2</td><td>1</td></tr>  <tr><td>1</td><td>1</td><td>1</td><td>3</td><td>5</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>3</td></tr>  <tr><td>2</td><td>1</td><td>2</td><td>2</td><td>3</td><td>1</td><td>1</td><td>4</td><td>4</td><td>2</td><td>2</td><td>1</td><td>1</td><td>1</td><td>1</td><td>2</td><td>1</td><td>1</td><td>1</td><td>2</td></tr>  <tr><td>1</td><td>1</td><td>3</td><td>2</td><td>3</td><td>3</td><td>1</td><td>1</td><td>2</td><td>1</td><td>2</td><td>1</td><td>4</td><td>3</td><td>3</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td></tr>  <tr><td>1</td><td>1</td><td>1</td><td>3</td><td>1</td><td>3</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>5</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td></tr>  <tr><td>1</td><td>1</td><td>2</td><td>2</td><td>2</td><td>3</td><td>2</td><td>2</td><td>1</td><td>2</td><td>2</td><td>1</td><td>1</td><td>1</td><td>3</td><td>2</td><td>1</td><td>1</td><td>1</td><td>1</td></tr>  <tr><td>1</td><td>1</td><td>3</td><td>4</td><td>4</td><td>2</td><td>1</td><td>1</td><td>2</td><td>1</td><td>2</td><td>1</td><td>3</td><td>2</td><td>2</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td></tr>  <tr><td>2</td><td>2</td><td>1</td><td>2</td><td>2</td><td>4</td><td>3</td><td>1</td><td>1</td><td>1</td><td>4</td><td>1</td><td>1</td><td>5</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td></tr>  <tr><td>1</td><td>1</td><td>1</td><td>1</td><td>2</td><td>5</td><td>1</td><td>1</td><td>1</td><td>1</td><td>2</td><td>2</td><td>4</td><td>3</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td></tr> </tbody></table>';
 
 var matrix = new grill.Matrix('#grill-log').loadFromHTMLTable('#tablita');
-//elementos
+//elements
 matrix.getOffsetMatrixX().reduceToEnd();
-//caracteristicas
-debugger;
+//characteristics
 matrix.getOffsetMatrixYKeepingMinAgainstComplement(5).reduceToEnd();
