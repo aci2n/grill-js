@@ -186,11 +186,28 @@
 	Matrix.keepMinValues = function(base, complement) {
 		var newMatrix = new Matrix(base.logTargetSelector);
 		newMatrix.labels.row = newMatrix.labels.col = base.labels.col.slice();
+		var complementCols = {};
 		
 		for (var i = 0; i < base.data.length; i++) {
 			var row = base.data[i];
+			
 			for (var j = 0; j < row.length; j++) {
-				newMatrix.set(i, j, Math.min(base.data[i][j], complement.data[i][j]));
+				var min = base.data[i][j];
+				
+				if (complement.data[i][j] < base.data[i][j]) {
+					min = complement.data[i][j];
+					if (j > i) {
+						complementCols[j] = true;
+					}
+				}
+				
+				newMatrix.set(i, j, min);
+			}
+		}
+		
+		for (var i = 0; i < newMatrix.labels.row.length; i++) {
+			if (complementCols[i]) {
+				newMatrix.labels.row[i] = '~' + newMatrix.labels.row[i];
 			}
 		}
 		
