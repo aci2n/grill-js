@@ -31,14 +31,29 @@
 			}
 		}
 		
-		this.log('loadFromHTMLTable');
-		
 		return this;
 	};
 	
-	Matrix.prototype.log = function(caller) {
+	Matrix.prototype.getCaller = function() {
+		//don't h8
+		var caller = this.getCaller.caller.caller;
+		var name = '';
+		
+		for (var prop in this) {
+			if (this[prop] === caller) {
+				name = prop;
+				break;
+			}
+		}
+		
+		return name;
+	};
+	
+	Matrix.prototype.log = function() {
+		var caller = '[' + this.getCaller() + '()]';
+		
 		if (this.debug) {
-			console.log('[' + caller + '()]');
+			console.log(caller);
 			console.log('Matrix: ' + this.data.length + 'x' + this.data[0].length);
 			console.log('\t' + this.labels.col.join('\t'));
 			for (var i = 0; i < this.data.length; i++) {
@@ -81,7 +96,7 @@
 		var offsetMatrix = new Matrix(this.logTargetSelector);		
 		offsetMatrix.labels.row = offsetMatrix.labels.col = this.labels[labelAxis].slice();
 		offsetCalculator.call(this, offsetMatrix);
-		offsetMatrix.log('getOffsetMatrix-' + labelAxis);
+		offsetMatrix.log();
 		return offsetMatrix;
 	};
 	
@@ -127,16 +142,16 @@
 			.split('-')
 			.sort((a, b) => parseInt(a.substr(1), 10) - parseInt(b.substr(1), 10))
 			.join('-');
-		for (var i = 0; i < len; i++) {
+			
+		for (var i = 0; i <= len; i++) {
 			var val = Math.min(this.data[i][min.x], this.data[i][min.y]);
 			this.set(i, len, val);
 			this.set(len, i, val);
 		}				
-		this.set(len, len, 0);
 		
 		this.removeRowColPair(min.x, min.y);
 		
-		this.log('reduceOnce');
+		this.log();
 		
 		return this;
 	};
@@ -160,19 +175,13 @@
 	};
 	
 	Matrix.prototype.removeRowColPair = function(a, b) {
-		var removeFirst = Math.min(a, b);
-		var removeSecond = Math.max(a, b) - 1;	
-		
-		this.data.splice(removeFirst, 1);
-		this.data.splice(removeSecond, 1);		
-		
-		for (var i = 0; i < this.data.length; i++) {
-			this.data[i].splice(removeFirst, 1);
-			this.data[i].splice(removeSecond, 1);
-		}		
-		
-		this.labels.row.splice(removeFirst, 1);
-		this.labels.row.splice(removeSecond, 1);
+		[Math.min(a, b), Math.max(a, b) - 1].forEach(indexToRemove => {
+			this.data.splice(indexToRemove, 1);
+			for (var i = 0; i < this.data.length; i++) {
+				this.data[i].splice(indexToRemove, 1);
+			}					
+			this.labels.row.splice(indexToRemove, 1);
+		});	
 		
 		return this;
 	};
