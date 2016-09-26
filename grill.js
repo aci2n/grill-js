@@ -62,7 +62,7 @@
 			html += '<tr><td>' + this.labels.row[i] + '</td>';
 			var row = this.data[i];
 			for (var j = 0; j < row.length; j++) {
-				html += '<td>' + row[j] + '</td>';
+				html += '<td>' + (j > i ? row[j] : '') + '</td>';
 			}
 			row += '</tr>';
 		}		
@@ -182,19 +182,7 @@
 		
 		return this.reduceOnce().reduceToEnd();
 	};
-	
-	Matrix.prototype.clone = function() {
-		var clonedMatrix = new Matrix(this.logTargetSelector);
-		
-		for (var i = 0; i < this.data.length; i++) {
-			clonedMatrix.data[i] = this.data[i].slice();
-		}		
-		clonedMatrix.labels.row = this.labels.row.slice();
-		clonedMatrix.labels.col = this.labels.col.slice();
-		
-		return clonedMatrix;
-	};
-	
+
 	Matrix.keepMinValues = function(base, complement) {
 		var newMatrix = new Matrix(base.logTargetSelector);
 		newMatrix.labels.row = newMatrix.labels.col = base.labels.col.slice();
