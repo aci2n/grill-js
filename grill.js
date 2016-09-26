@@ -93,15 +93,18 @@
 		return offsetMatrix;
 	};
 	
-	Matrix.prototype.getOffsetMatrixY = function(against) {
-		against = against || this;
+	Matrix.prototype.getOffsetMatrixY = function(complement) {
 		var offsetMatrix = new Matrix(this.logTargetSelector);
 			
 		for (var i = 0; i < this.data[0].length; i++) {
 			for (var j = 0; j < this.data[0].length; j++) {
 				var offset = 0;
 				for (var k = 0; i !== j && k < this.data.length; k++) {
-					offset += Math.abs(this.data[k][i] - against.data[k][j]);
+					var subtrahend = this.data[k][j];
+					if (complement) {
+						subtrahend = complement + 1 - subtrahend; 
+					}
+					offset += Math.abs(this.data[k][i] - subtrahend);
 				}
 				offsetMatrix.set(i, j, offset);
 			}
@@ -192,23 +195,7 @@
 		return clonedMatrix;
 	};
 	
-	Matrix.prototype.getComplement = function(max) {
-		var complementMatrix = this.clone();
-		
-		max++;
-		for (var i = 0; i < complementMatrix.data.length; i++) {
-			var row = complementMatrix.data[i];
-			for (var j = 0; j < row.length; j++) {
-				complementMatrix.set(i, j, max - row[j]);
-			}
-		}
-		
-		complementMatrix.log('getComplement');
-		
-		return complementMatrix;
-	};
-	
-	Matrix.keepMinAgainstComplement = function(base, complement) {
+	Matrix.keepMinValues = function(base, complement) {
 		var newMatrix = new Matrix(base.logTargetSelector);
 		newMatrix.labels.row = newMatrix.labels.col = base.labels.col.slice();
 		
@@ -224,11 +211,8 @@
 		return newMatrix;
 	};
 	
-	Matrix.prototype.getOffsetMatrixYKeepingMinAgainstComplement = function(max) {
-		var offsetBase = this.getOffsetMatrixY();
-		var offsetComplement = this.getOffsetMatrixY(this.getComplement(max));
-				
-		return Matrix.keepMinAgainstComplement(offsetBase, offsetComplement);
+	Matrix.prototype.getOffsetMatrixYKeepingMinAgainstComplement = function(complement) {
+		return Matrix.keepMinValues(this.getOffsetMatrixY(), this.getOffsetMatrixY(complement));
 	};
 	
 	grill.Matrix = Matrix;
